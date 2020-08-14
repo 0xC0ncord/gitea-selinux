@@ -1,0 +1,125 @@
+policy_module(gitea, 1.0)
+
+gen_require(`
+    type usr_t;
+')
+
+########################################
+#
+# Declarations
+#
+
+## <desc>
+##  <p>
+##  Determine whether Gitea can connect to the MySQL database
+##  </p>
+## </desc>
+gen_tunable(gitea_mysql_connect, false)
+
+## <desc>
+##  <p>
+##  Determine whether Gitea can connect to the Postgresql database
+##  </p>
+## </desc>
+gen_tunable(gitea_postgresql_connect, false)
+
+type gitea_t;
+type gitea_exec_t;
+application_executable_file(gitea_exec_t)
+init_daemon_domain(gitea_t, gitea_exec_t)
+
+type gitea_initrc_exec_t;
+init_script_file(gitea_initrc_exec_t)
+
+type gitea_etc_t;
+files_config_file(gitea_etc_t)
+
+type gitea_var_lib_t;
+files_type(gitea_var_lib_t)
+
+type gitea_hook_t;
+files_type(gitea_hook_t)
+
+type gitea_log_t;
+logging_log_file(gitea_log_t)
+
+type gitea_runtime_t alias gitea_var_run_t;
+files_pid_file(gitea_runtime_t)
+
+type gitea_port_t;
+corenet_port(gitea_port_t)
+
+type gitea_ssh_port_t;
+corenet_port(gitea_ssh_port_t)
+
+########################################
+#
+# Local policy
+#
+
+allow gitea_t self:process { getsched setsched signal_perms };
+allow gitea_t self:fifo_file rw_fifo_file_perms;
+allow gitea_t self:tcp_socket all_tcp_socket_perms;
+allow gitea_t gitea_port_t:tcp_socket { name_bind name_connect };
+allow gitea_t gitea_port_t:unix_stream_socket create_stream_socket_perms;
+allow gitea_t gitea_ssh_port_t:tcp_socket { name_bind name_connect };
+allow gitea_t gitea_ssh_port_t:unix_stream_socket create_stream_socket_perms;
+
+allow gitea_t self:unix_stream_socket create_stream_socket_perms;
+
+corenet_tcp_connect_http_port(gitea_t)
+
+corenet_tcp_bind_generic_node(gitea_t)
+
+kernel_search_network_sysctl(gitea_t)
+kernel_read_net_sysctls(gitea_t)
+
+corecmd_exec_bin(gitea_t)
+auth_use_nsswitch(gitea_t)
+
+miscfiles_read_localization(gitea_t)
+
+list_dirs_pattern(gitea_t, usr_t, usr_t);
+read_files_pattern(gitea_t, usr_t, usr_t);
+
+read_files_pattern(initrc_t, gitea_etc_t, gitea_etc_t)
+read_files_pattern(gitea_t, gitea_etc_t, gitea_etc_t)
+
+files_search_var_lib(gitea_t)
+search_dirs_pattern(gitea_t, gitea_var_lib_t, gitea_var_lib_t)
+manage_dirs_pattern(gitea_t, gitea_var_lib_t, gitea_var_lib_t)
+manage_files_pattern(gitea_t, gitea_var_lib_t, gitea_var_lib_t)
+manage_lnk_files_pattern(gitea_t, gitea_var_lib_t, gitea_var_lib_t)
+allow gitea_t gitea_var_lib_t:file map;
+
+manage_dirs_pattern(gitea_t, gitea_hook_t, gitea_hook_t)
+manage_files_pattern(gitea_t, gitea_hook_t, gitea_hook_t)
+allow gitea_t gitea_hook_t:file { execute execute_no_trans };
+filetrans_pattern(gitea_t, gitea_var_lib_t, gitea_hook_t, { dir }, "hooks")
+corecmd_exec_shell(gitea_t)
+
+allow gitea_t gitea_log_t:dir { setattr_dir_perms remove_name write };
+write_files_pattern(gitea_t, gitea_log_t, gitea_log_t)
+append_files_pattern(gitea_t, gitea_log_t, gitea_log_t)
+create_files_pattern(gitea_t, gitea_log_t, gitea_log_t)
+rename_files_pattern(gitea_t, gitea_log_t, gitea_log_t)
+setattr_files_pattern(gitea_t, gitea_log_t, gitea_log_t)
+allow gitea_t gitea_log_t:file { unlink };
+logging_log_filetrans(gitea_t, gitea_log_t, { dir file })
+#logging_send_syslog_msg(gitea_t)
+
+manage_dirs_pattern(gitea_t, gitea_runtime_t, gitea_runtime_t)
+manage_files_pattern(gitea_t, gitea_runtime_t, gitea_runtime_t)
+files_pid_filetrans(gitea_t, gitea_runtime_t, { file dir })
+
+can_exec(gitea_t, gitea_exec_t, gitea_exec_t)
+
+tunable_policy(`gitea_mysql_connect',`
+	mysql_stream_connect(gitea_t)
+	mysql_tcp_connect(gitea_t)
+')
+
+tunable_policy(`gitea_postgresql_connect',`
+	postgresql_stream_connect(gitea_t)
+	postgresql_tcp_connect(gitea_t)
+')
